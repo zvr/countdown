@@ -1,0 +1,42 @@
+# countdown -- Makefile
+#
+# Copyright (C) 2026 Alexios Zavras
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# Defaults can be overridden, e.g.:
+#   make CFLAGS='-O2 -DDEFAULT_DICT=\"/usr/share/dict/words\"'
+
+CC      ?= cc
+CFLAGS  ?= -O2
+CFLAGS  += -Wall -Wextra
+PREFIX  ?= /usr/local
+BINDIR  ?= $(PREFIX)/bin
+
+PROG    = countdown
+OBJS    = countdown.o numbers.o letters.o
+
+.PHONY: all clean install uninstall check
+
+all: $(PROG)
+
+$(PROG): $(OBJS)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(OBJS)
+
+countdown.o: countdown.c numbers.h letters.h
+numbers.o: numbers.c numbers.h
+letters.o: letters.c letters.h
+
+check: $(PROG)
+	./$(PROG) 3 8 7 2 50 75 812
+	./$(PROG) -d words.txt -n 5 chartesop
+	./$(PROG) -r -l 2
+
+install: $(PROG)
+	mkdir -p $(DESTDIR)$(BINDIR)
+	cp $(PROG) $(DESTDIR)$(BINDIR)/
+
+uninstall:
+	rm -f $(DESTDIR)$(BINDIR)/$(PROG)
+
+clean:
+	rm -f $(PROG) $(OBJS)

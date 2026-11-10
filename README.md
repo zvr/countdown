@@ -14,32 +14,54 @@ Rules:
 
 ## Building
 
-With GCC or Clang:
+Source layout:
 
-    cc -Wall -Wextra -O2 -o countdown countdown.c
+- `countdown.c` -- command-line handling
+- `numbers.c`, `numbers.h` -- numbers round solver and random puzzles
+- `letters.c`, `letters.h` -- letters round solver
+- `compat/getopt.c`, `compat/getopt.h` -- `getopt_long()` for MSVC,
+  which lacks `<getopt.h>`
 
-With MSVC (from a Developer Command Prompt):
+With make (GCC or Clang):
 
-    cl /nologo /W4 /O2 countdown.c
+    make
+    make check
+    make install PREFIX=/usr/local
 
-Defaults can be changed at compile time with `-D` (`/D` for MSVC):
+With CMake (any platform, including Visual Studio):
 
-| Macro           | Default       | Meaning                                  |
-|-----------------|---------------|------------------------------------------|
-| `DEFAULT_DICT`  | `"words.txt"` | dictionary file for letters rounds       |
-| `DEFAULT_COUNT` | `50`          | maximum number of words shown            |
+    cmake -B build
+    cmake --build build --config Release
+
+With MSVC directly (from a Developer Command Prompt):
+
+    cl /nologo /W4 /O2 countdown.c numbers.c letters.c compat\getopt.c
+
+Defaults can be changed at compile time:
+
+| Macro           | Default       | Meaning                                   |
+|-----------------|---------------|-------------------------------------------|
+| `DEFAULT_DICT`  | `"words.txt"` | dictionary file for letters rounds        |
+| `DEFAULT_COUNT` | `50`          | maximum number of words shown             |
 | `MAX_NUMBERS`   | `16`          | maximum numbers accepted in number rounds |
-| `MAX_EXPR`      | `1024`        | maximum length of a solution expression  |
+| `MAX_EXPR`      | `1024`        | maximum length of a solution expression   |
+| `MAX_LETTERS`   | `255`         | maximum letters in a letters round        |
+| `VERSION`       | `"0.1"`       | version reported by `--version`           |
 
 For example:
 
-    cc -O2 -DDEFAULT_DICT='"/usr/share/dict/words"' -DDEFAULT_COUNT=20 -o countdown countdown.c
+    make CFLAGS='-O2 -DDEFAULT_DICT=\"/usr/share/dict/words\" -DDEFAULT_COUNT=20'
+    cmake -B build -DDEFAULT_DICT=/usr/share/dict/words -DDEFAULT_COUNT=20
 
 ## Usage
 
-    countdown number... target
-    countdown -r|--random [-l|--large n]
-    countdown [-d|--dict file] [-n|--count n] letters...
+    countdown [options] number... target
+    countdown [options] -r|--random [-l|--large n]
+    countdown [options] letters...
+
+Options may appear anywhere on the command line, short options can be
+combined (`-rl2`), and long options accept `--name=value`.
+`-h` / `--help` shows a summary; `-V` / `--version` prints the version.
 
 All arguments must be positive integers; the last one is the target
 (at most 16 numbers are supported).
@@ -90,6 +112,12 @@ longest first (ties sorted alphabetically), with their length:
   (default `words.txt` in the current directory); case is ignored and
   words containing non-letters are skipped.
 - `-n n` / `--count n`: maximum number of words to show (default 50).
+
+The bundled `words.txt` is only a small sample for testing.
+For real use, point `-d` at a full word list, e.g. `/usr/share/dict/words`
+on most Unix systems, or a list such as
+[SCOWL](http://wordlist.aspell.net/) or
+[dwyl/english-words](https://github.com/dwyl/english-words).
 
 ## License
 
