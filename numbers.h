@@ -18,22 +18,31 @@
 #ifndef MAX_EXPR
 #define MAX_EXPR 1024
 #endif
+#ifndef TT_BITS
+#define TT_BITS 18      /* log2 of the solver's transposition table size */
+#endif
 
 /*
  * Find an expression combining (a subset of) the n numbers that is as close
- * as possible to target. The expression is stored into expr (of the given
- * size) and its value into *value.
+ * as possible to target, using as few operations as possible.
+ * The expression is stored into expr (of the given size) and its value
+ * into *value.
  */
 void numbers_solve(const long *numbers, int n, long target,
 		   char *expr, size_t size, long *value);
+
+/* A seed that differs between runs, even within the same second. */
+unsigned long long numbers_auto_seed(void);
 
 /*
  * Generate a random puzzle following the TV show rules:
  * six numbers, 0-4 of them "large" (25, 50, 75, 100, each at most once;
  * nlarge < 0 picks the count at random),
  * the rest "small" (1-10, each at most twice), and a target in 100-999.
+ * The same seed always gives the same puzzle.
  * numbers must have room for 6 entries; returns the number of entries.
  */
-int numbers_random(long *numbers, long *target, int nlarge);
+int numbers_random(long *numbers, long *target, int nlarge,
+		   unsigned long long seed);
 
 #endif

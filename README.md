@@ -5,6 +5,7 @@ A command-line utility that solves Countdown number and letter rounds.
 Given a list of numbers and a target, it finds a combination of
 addition, subtraction, multiplication and division that reaches the
 target, or gets as close to it as possible.
+Among equally good results, one using the fewest operations is shown.
 
 Rules:
 - not all numbers need to be used;
@@ -46,6 +47,7 @@ Defaults can be changed at compile time:
 | `MAX_NUMBERS`   | `16`          | maximum numbers accepted in number rounds |
 | `MAX_EXPR`      | `1024`        | maximum length of a solution expression   |
 | `MAX_LETTERS`   | `255`         | maximum letters in a letters round        |
+| `TT_BITS`       | `18`          | log2 of the solver's state cache entries  |
 | `VERSION`       | `"0.1"`       | version reported by `--version`           |
 
 For example:
@@ -56,7 +58,7 @@ For example:
 ## Usage
 
     countdown [options] number... target
-    countdown [options] -r|--random [-l|--large n]
+    countdown [options] -r|--random [-l|--large n] [-s|--seed n]
     countdown [options] letters...
 
 Options may appear anywhere on the command line, short options can be
@@ -71,20 +73,27 @@ With `-r` / `--random`, a puzzle is generated following the TV show rules
 from 1-10, each at most twice; target between 100 and 999), printed, and solved:
 
     $ countdown -r
-    100 2 8 5 1 7 -> 760
-    (100 + 2 - 7) * 8 = 760
+    100 2 2 5 10 9 -> 716   (seed 1147596281817677428)
+    (100 + 2) * (9 - 2) + 10 / 5 = 716
+
+Each run uses a different seed; pass it back with `-s n` / `--seed n`
+to get the same puzzle again:
+
+    $ countdown -r -s 42
+    75 3 9 5 9 2 -> 713   (seed 42)
+    (75 + 3) * 9 + 2 + 9 = 713
 
 Use `-l n` / `--large n` (0-4) together with `-r` to choose how many
 large numbers the random puzzle contains (random by default):
 
-    $ countdown -r -l 0
-    4 6 9 1 10 5 -> 455
-    (10 * 9 + 1) * (6 + 4 - 5) = 455
+    $ countdown -r -l 4 -s 42
+    100 50 75 25 2 6 -> 713   (seed 42)
+    (100 - 75 + 6) * (25 - 2) = 713
 
 Examples:
 
     $ countdown 3 8 7 2 50 75 812
-    (75 - (8 + 3) + 50 + 2) * 7 = 812
+    (50 + 8) * 7 * 2 = 812
 
     $ countdown 25 50 75 100 3 6 952
     (75 * 3 * (100 + 6) - 50) / 25 = 952

@@ -64,12 +64,13 @@ static void usage(FILE *f)
 {
 	fprintf(f,
 		"usage: %s [options] number... target\n"
-		"       %s [options] -r|--random [-l|--large n]\n"
+		"       %s [options] -r|--random [-l|--large n] [-s|--seed n]\n"
 		"       %s [options] letters...\n"
 		"\n"
 		"options:\n"
 		"  -r, --random       generate and solve a random numbers round\n"
 		"  -l, --large n      number of large numbers (0-4) with --random\n"
+		"  -s, --seed n       seed for --random, to reproduce a puzzle\n"
 		"  -d, --dict file    word list for letters rounds "
 		"(default \"%s\")\n"
 		"  -n, --count n      maximum number of words to show "
@@ -111,15 +112,15 @@ static void print_numbers(const long *numbers, int n, long target)
 	printf("%s = %ld\n", expr, value);
 }
 
-static int run_random(int nlarge)
+static int run_random(int nlarge, unsigned long long seed)
 {
 	long numbers[6], target;
 	int n, i;
 
-	n = numbers_random(numbers, &target, nlarge);
+	n = numbers_random(numbers, &target, nlarge, seed);
 	for (i = 0; i < n; i++)
 		printf("%ld ", numbers[i]);
-	printf("-> %ld\n", target);
+	printf("-> %ld   (seed %llu)\n", target, seed);
 	print_numbers(numbers, n, target);
 	return EXIT_SUCCESS;
 }
@@ -186,6 +187,7 @@ int main(int argc, char *argv[])
 	static const struct option longopts[] = {
 		{ "random",  no_argument,       NULL, 'r' },
 		{ "large",   required_argument, NULL, 'l' },
+		{ "seed",    required_argument, NULL, 's' },
 		{ "dict",    required_argument, NULL, 'd' },
 		{ "count",   required_argument, NULL, 'n' },
 		{ "help",    no_argument,       NULL, 'h' },
@@ -195,16 +197,30 @@ int main(int argc, char *argv[])
 	const char *dict = DEFAULT_DICT;
 	long max_words = DEFAULT_COUNT;
 	int random = 0, nlarge = -1;
+	int have_seed = 0;
+	unsigned long long seed = 0;
+	char *end;
 	int c;
 
 	if (argc > 0 && argv[0] != NULL && argv[0][0] != '\0')
 		prog = argv[0];
 
-	while ((c = getopt_long(argc, argv, "rl:d:n:hV",
+	while ((c = getopt_long(argc, argv, "rl:s:d:n:hV",
 				longopts, NULL)) != -1) {
 		switch (c) {
 		case 'r':
 			random = 1;
+			break;
+		case 's':
+			errno = 0;
+			seed = strtoull(optarg, &end, 10);
+			if (errno != 0 || end == optarg || *end != '\0' ||
+			    optarg[0] == '-') {
+				fprintf(stderr, "%s: --seed requires a "
+					"non-negative number\n", prog);
+				return EXIT_FAILURE;
+			}
+			have_seed = 1;
 			break;
 		case 'l':
 			if (strlen(optarg) != 1 ||
@@ -244,11 +260,12 @@ int main(int argc, char *argv[])
 			usage(stderr);
 			return EXIT_FAILURE;
 		}
-		return run_random(nlarge);
+		return run_random(nlarge,
+				  have_seed ? seed : numbers_auto_seed());
 	}
-	if (nlarge >= 0) {
-		fprintf(stderr, "%s: -l/--large is only valid "
-			"with -r/--random\n", prog);
+	if (nlarge >= 0 || have_seed) {
+		fprintf(stderr, "%s: -l/--large and -s/--seed are only "
+			"valid with -r/--random\n", prog);
 		return EXIT_FAILURE;
 	}
 	if (argc > 0 && is_word_arg(argv[0]))
