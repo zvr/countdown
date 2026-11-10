@@ -32,3 +32,4 @@ endif()
 
 include(GNUInstallDirs)
 install(TARGETS countdown RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+install(FILES countdown.1 DESTINATION ${CMAKE_INSTALL_MANDIR}/man1)

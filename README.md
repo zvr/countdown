@@ -5,7 +5,10 @@ A command-line utility that solves Countdown number and letter rounds.
 Given a list of numbers and a target, it finds a combination of
 addition, subtraction, multiplication and division that reaches the
 target, or gets as close to it as possible.
-Among equally good results, one using the fewest operations is shown.
+Among equally good results, one using the fewest operations is shown;
+ties are broken by preferring fewer divisions, then smaller intermediate
+values. Steps that achieve nothing (`x * 1`, `x / 1`, `a - a`, or
+`a - b` / `a / b` giving back `b`) are never used.
 
 Rules:
 - not all numbers need to be used;
@@ -22,6 +25,8 @@ Source layout:
 - `letters.c`, `letters.h` -- letters round solver
 - `compat/getopt.c`, `compat/getopt.h` -- `getopt_long()` for MSVC,
   which lacks `<getopt.h>`
+- `countdown.1` -- manual page (installed by `make install` and CMake;
+  view with `man ./countdown.1`)
 
 With make (GCC or Clang):
 
@@ -64,13 +69,16 @@ For example:
 
 Numbers round options:
 
-- `-a` / `--all`: list all distinct exact solutions, shortest first
+- `-a` / `--all`: list all distinct exact solutions, simplest first
   (at most `-n` of them). Solutions differing only in the order of
-  operands, like `a * b * c` and `a * c * b`, are listed once.
+  operands, like `a * b * c` and `a * c * b`, are listed once, and so are
+  solutions that build a number which is available unused (e.g. `(2 + 1)`
+  when a `3` is left over).
 - `-t secs` / `--time secs`: stop searching after this much CPU time and
   show the best result found so far (a warning is printed on stderr).
   With a time limit, half of it is first spent on a quick depth-first
   search, so a good result is available even for large inputs.
+- `-w` / `--wall`: measure `--time` as elapsed (wall-clock) time.
 
 Letters round options:
 
@@ -111,7 +119,7 @@ Examples:
     (50 + 8) * 7 * 2 = 812
 
     $ countdown 25 50 75 100 3 6 952
-    (75 * 3 * (100 + 6) - 50) / 25 = 952
+    (100 + 3) * 75 * 6 / 50 + 25 = 952
 
 If the target cannot be reached exactly, the closest result is shown:
 

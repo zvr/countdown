@@ -11,6 +11,7 @@ CFLAGS  ?= -O2
 CFLAGS  += -Wall -Wextra
 PREFIX  ?= /usr/local
 BINDIR  ?= $(PREFIX)/bin
+MANDIR  ?= $(PREFIX)/share/man/man1
 
 PROG    = countdown
 OBJS    = countdown.o numbers.o letters.o
@@ -34,9 +35,12 @@ check: $(PROG)
 install: $(PROG)
 	mkdir -p $(DESTDIR)$(BINDIR)
 	cp $(PROG) $(DESTDIR)$(BINDIR)/
+	mkdir -p $(DESTDIR)$(MANDIR)
+	cp $(PROG).1 $(DESTDIR)$(MANDIR)/
 
 uninstall:
 	rm -f $(DESTDIR)$(BINDIR)/$(PROG)
+	rm -f $(DESTDIR)$(MANDIR)/$(PROG).1
 
 clean:
 	rm -f $(PROG) $(OBJS)

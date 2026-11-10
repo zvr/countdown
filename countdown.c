@@ -79,6 +79,7 @@ static void usage(FILE *f)
 		"  -s, --seed n       seed for --random, to reproduce a puzzle\n"
 		"  -a, --all          list all exact solutions of a numbers round\n"
 		"  -t, --time secs    time limit for solving a numbers round\n"
+		"  -w, --wall         measure --time as elapsed, not CPU, time\n"
 		"  -C, --conundrum    only words using all the letters\n"
 		"  -d, --dict file    word list for letters rounds "
 		"(default \"%s\")\n"
@@ -210,6 +211,7 @@ int main(int argc, char *argv[])
 		{ "seed",    required_argument, NULL, 's' },
 		{ "all",     no_argument,       NULL, 'a' },
 		{ "time",    required_argument, NULL, 't' },
+		{ "wall",    no_argument,       NULL, 'w' },
 		{ "conundrum", no_argument,     NULL, 'C' },
 		{ "dict",    required_argument, NULL, 'd' },
 		{ "count",   required_argument, NULL, 'n' },
@@ -219,7 +221,7 @@ int main(int argc, char *argv[])
 	};
 	const char *dict = DEFAULT_DICT;
 	double time_limit = DEFAULT_TIME_LIMIT;
-	int random = 0, nlarge = -1, conundrum = 0;
+	int random = 0, nlarge = -1, conundrum = 0, wall = 0;
 	int have_seed = 0;
 	unsigned long long seed = 0;
 	char *end;
@@ -228,7 +230,7 @@ int main(int argc, char *argv[])
 	if (argc > 0 && argv[0] != NULL && argv[0][0] != '\0')
 		prog = argv[0];
 
-	while ((c = getopt_long(argc, argv, "rl:s:at:Cd:n:hV",
+	while ((c = getopt_long(argc, argv, "rl:s:at:wCd:n:hV",
 				longopts, NULL)) != -1) {
 		switch (c) {
 		case 'r':
@@ -236,6 +238,9 @@ int main(int argc, char *argv[])
 			break;
 		case 'a':
 			all_solutions = 1;
+			break;
+		case 'w':
+			wall = 1;
 			break;
 		case 'C':
 			conundrum = 1;
@@ -293,7 +298,7 @@ int main(int argc, char *argv[])
 	}
 	argc -= optind;
 	argv += optind;
-	numbers_set_time_limit(time_limit);
+	numbers_set_time_limit(time_limit, wall);
 
 	if (random) {
 		if (argc > 0 || conundrum) {

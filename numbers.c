@@ -26,6 +26,8 @@
 
 struct node {
 	long value;
+	long maxv;	/* largest intermediate result (0 for a number) */
+	int ndiv;	/* number of divisions in expr */
 	int ops;	/* number of operations in expr */
 	char op;	/* top-level operator, or 0 for a plain number */
 	char expr[MAX_EXPR];
@@ -35,7 +37,13 @@ static long target;
 static long best_diff;
 static long best_value;
 static int best_ops;
+static int best_ndiv;
+static long best_maxv;
 static char best_expr[MAX_EXPR];
+
+/* The input numbers of the current search. */
+static long inputs[MAX_NUMBERS];
+static int ninputs;
 
 /*
  * Transposition table: hashes of the multisets of values already explored
@@ -85,14 +93,32 @@ static long diff(long v)
 	return v > target ? v - target : target - v;
 }
 
+/*
+ * Among equally close results, prefer fewer operations, then fewer
+ * divisions, then smaller intermediate values.
+ */
+static int simpler(int ops, int ndiv, long maxv,
+		   int ops2, int ndiv2, long maxv2)
+{
+	if (ops != ops2)
+		return ops < ops2;
+	if (ndiv != ndiv2)
+		return ndiv < ndiv2;
+	return maxv < maxv2;
+}
+
 static void consider(const struct node *n)
 {
 	long d = diff(n->value);
 
-	if (d < best_diff || (d == best_diff && n->ops < best_ops)) {
+	if (d < best_diff || (d == best_diff &&
+	    simpler(n->ops, n->ndiv, n->maxv,
+		    best_ops, best_ndiv, best_maxv))) {
 		best_diff = d;
 		best_value = n->value;
 		best_ops = n->ops;
+		best_ndiv = n->ndiv;
+		best_maxv = n->maxv;
 		snprintf(best_expr, MAX_EXPR, "%s", n->expr);
 	}
 }
@@ -129,11 +155,22 @@ static int combine(struct node *out, const struct node *a,
 		return 0;
 	out->value = value;
 	out->ops = a->ops + b->ops + 1;
+	out->ndiv = a->ndiv + b->ndiv + (op == '/');
+	out->maxv = value;
+	if (a->maxv > out->maxv)
+		out->maxv = a->maxv;
+	if (b->maxv > out->maxv)
+		out->maxv = b->maxv;
 	out->op = op;
 	return 1;
 }
 
-/* Compute a op b; returns 0 if not allowed or not useful. */
+/*
+ * Compute a op b (a >= b); returns 0 if not allowed or not useful.
+ * Steps that cannot lead to anything new are rejected: results of 0
+ * (a - a), identities (x * 1, x / 1), and steps giving back one of
+ * their operands (a - b == b, a / b == b), which only discard a number.
+ */
 static int apply(char op, long a, long b, long *v)
 {
 	switch (op) {
@@ -143,7 +180,7 @@ static int apply(char op, long a, long b, long *v)
 		*v = a + b;
 		return 1;
 	case '-':
-		if (a == b)
+		if (a == b || a - b == b)
 			return 0;
 		*v = a - b;
 		return 1;
@@ -153,19 +190,31 @@ static int apply(char op, long a, long b, long *v)
 		*v = a * b;
 		return 1;
 	default:
-		if (b <= 1 || a % b != 0)
+		if (b <= 1 || a % b != 0 || a / b == b)
 			return 0;
 		*v = a / b;
 		return 1;
 	}
 }
 
-/* Time limit (CPU seconds, 0 = none) and search state. */
+/* Time limit (seconds, 0 = none) and search state. */
 static double time_limit;
-static clock_t deadline;
+static int wall_clock;	/* measure elapsed instead of CPU time */
+static double deadline;
 static unsigned long node_count;
 static int timed_out;
 static int cur_limit;	/* operations allowed in the current pass */
+
+static double now(void)
+{
+	if (wall_clock) {
+		struct timespec ts;
+
+		if (timespec_get(&ts, TIME_UTC) == TIME_UTC)
+			return (double) ts.tv_sec + ts.tv_nsec / 1e9;
+	}
+	return (double) clock() / CLOCKS_PER_SEC;
+}
 
 /* When listing all solutions, the exact ones found so far. */
 static int all_mode;
@@ -173,6 +222,8 @@ static int all_failed;
 static struct solution {
 	char *expr;
 	int ops;
+	int ndiv;
+	long maxv;
 } *solutions;
 static size_t nsolutions, solutions_size;
 
@@ -374,12 +425,86 @@ static void canonicalize(const char *expr, char *out)
 	free(c);
 }
 
+/*
+ * Evaluate t, storing intermediate values in its nodes and marking in
+ * used[] the inputs it consumes. Returns 0 if t is not well formed.
+ */
+static int eval(struct tree *t, char *used)
+{
+	long x, y;
+	int i;
+
+	if (t->op == 0) {
+		for (i = 0; i < ninputs; i++) {
+			if (!used[i] && inputs[i] == t->value) {
+				used[i] = 1;
+				return 1;
+			}
+		}
+		return 0;
+	}
+	if (!eval(t->l, used) || !eval(t->r, used))
+		return 0;
+	x = t->l->value;
+	y = t->r->value;
+	switch (t->op) {
+	case '+':
+		t->value = x + y;
+		break;
+	case '-':
+		t->value = x - y;
+		break;
+	case '*':
+		t->value = x * y;
+		break;
+	default:
+		if (y == 0)
+			return 0;
+		t->value = x / y;
+		break;
+	}
+	return 1;
+}
+
+/*
+ * A solution is redundant if one of its sub-expressions equals an unused
+ * input: replacing it with that number gives a simpler solution, which is
+ * listed instead. E.g. with 1 2 3 3 -> 18, "((2 + 1) * 3 - 3) * (2 + 1)"
+ * is redundant, since (2 + 1) could be the unused 3.
+ */
+static int redundant(const struct tree *t, const char *used)
+{
+	int i;
+
+	if (t->op == 0)
+		return 0;
+	for (i = 0; i < ninputs; i++)
+		if (!used[i] && inputs[i] == t->value)
+			return 1;
+	return redundant(t->l, used) || redundant(t->r, used);
+}
+
+static int is_redundant(const char *expr)
+{
+	char used[MAX_NUMBERS] = { 0 };
+	struct tree *t;
+
+	tree_used = 0;
+	parse_pos = expr;
+	t = parse_sum();
+	if (t == NULL || *parse_pos != '\0' || !eval(t, used))
+		return 0;
+	return redundant(t, used);
+}
+
 static void add_solution(const struct node *r)
 {
 	char expr[MAX_EXPR];
 	size_t len;
 	char *copy;
 
+	if (is_redundant(r->expr))
+		return;
 	canonicalize(r->expr, expr);
 	len = strlen(expr) + 1;
 	if (nsolutions == solutions_size) {
@@ -401,16 +526,20 @@ static void add_solution(const struct node *r)
 	memcpy(copy, expr, len);
 	solutions[nsolutions].expr = copy;
 	solutions[nsolutions].ops = r->ops;
+	solutions[nsolutions].ndiv = r->ndiv;
+	solutions[nsolutions].maxv = r->maxv;
 	nsolutions++;
 }
 
 static int search_done(void)
 {
 	if (!timed_out && time_limit > 0 && (++node_count & 1023) == 0 &&
-	    clock() >= deadline)
+	    now() >= deadline)
 		timed_out = 1;
+	/* an exact result with a division may still have a simpler rival */
 	return timed_out || all_failed ||
-	       (!all_mode && best_diff == 0 && best_ops <= cur_limit);
+	       (!all_mode && best_diff == 0 && best_ops <= cur_limit &&
+		best_ndiv == 0);
 }
 
 static void start_timer(void)
@@ -418,12 +547,13 @@ static void start_timer(void)
 	timed_out = 0;
 	node_count = 0;
 	if (time_limit > 0)
-		deadline = clock() + (clock_t) (time_limit * CLOCKS_PER_SEC);
+		deadline = now() + time_limit;
 }
 
-void numbers_set_time_limit(double seconds)
+void numbers_set_time_limit(double seconds, int wall)
 {
 	time_limit = seconds;
+	wall_clock = wall;
 }
 
 int numbers_timed_out(void)
@@ -522,14 +652,20 @@ static int init_search(const long *numbers, int n, long tgt,
 	best_diff = LONG_MAX;
 	best_value = 0;
 	best_ops = INT_MAX;
+	best_ndiv = INT_MAX;
+	best_maxv = LONG_MAX;
 	best_expr[0] = '\0';
 	*hash = 0;
 
 	if (n > MAX_NUMBERS)
 		n = MAX_NUMBERS;
+	ninputs = n;
 	for (i = 0; i < n; i++) {
+		inputs[i] = numbers[i];
 		nodes[i].value = numbers[i];
 		nodes[i].ops = 0;
+		nodes[i].ndiv = 0;
+		nodes[i].maxv = 0;
 		nodes[i].op = 0;
 		snprintf(nodes[i].expr, MAX_EXPR, "%ld", numbers[i]);
 		*hash += value_hash(numbers[i]);
@@ -557,13 +693,13 @@ void numbers_solve(const long *numbers, int n, long tgt,
 	 * search, which quickly finds good (if not the shortest) results.
 	 */
 	if (time_limit > 0 && n > 2) {
-		clock_t start = clock();
+		double start = now();
 
-		deadline = start + (clock_t) (time_limit / 2 * CLOCKS_PER_SEC);
+		deadline = start + time_limit / 2;
 		cur_limit = n - 1;
 		solve(nodes, n, hash, n - 1);
 		timed_out = 0;
-		deadline = start + (clock_t) (time_limit * CLOCKS_PER_SEC);
+		deadline = start + time_limit;
 		if (seen != NULL)
 			memset(seen, 0, (seen_mask + 1) * sizeof *seen);
 	}
@@ -573,7 +709,7 @@ void numbers_solve(const long *numbers, int n, long tgt,
 	 * complete, no exact solution shorter than its limit exists.
 	 */
 	for (limit = 1; limit < n && !timed_out; limit++) {
-		if (best_diff == 0 && best_ops <= limit)
+		if (best_diff == 0 && best_ops < limit)
 			break;
 		if (seen != NULL)
 			memset(seen, 0, (seen_mask + 1) * sizeof *seen);
@@ -587,12 +723,20 @@ void numbers_solve(const long *numbers, int n, long tgt,
 	*value = best_value;
 }
 
+static int cmp_solution_text(const void *a, const void *b)
+{
+	return strcmp(((const struct solution *) a)->expr,
+		      ((const struct solution *) b)->expr);
+}
+
 static int cmp_solutions(const void *a, const void *b)
 {
 	const struct solution *sa = a, *sb = b;
 
-	if (sa->ops != sb->ops)
-		return sa->ops < sb->ops ? -1 : 1;
+	if (sa->ops != sb->ops || sa->ndiv != sb->ndiv ||
+	    sa->maxv != sb->maxv)
+		return simpler(sa->ops, sa->ndiv, sa->maxv,
+			       sb->ops, sb->ndiv, sb->maxv) ? -1 : 1;
 	return strcmp(sa->expr, sb->expr);
 }
 
@@ -616,12 +760,33 @@ long numbers_solve_all(const long *numbers, int n, long tgt,
 	if (all_failed)
 		fprintf(stderr, "warning: out of memory, "
 			"not all solutions were collected\n");
-	if (nsolutions > 0)
+	if (nsolutions > 0) {
+		size_t m = 0;
+
+		/* merge duplicates, keeping the simplest way to compute each */
+		qsort(solutions, nsolutions, sizeof *solutions,
+		      cmp_solution_text);
+		for (i = 0; i < nsolutions; i++) {
+			struct solution *s = &solutions[i];
+
+			if (m > 0 && strcmp(s->expr, solutions[m - 1].expr) == 0) {
+				struct solution *k = &solutions[m - 1];
+
+				if (simpler(s->ops, s->ndiv, s->maxv,
+					    k->ops, k->ndiv, k->maxv)) {
+					k->ops = s->ops;
+					k->ndiv = s->ndiv;
+					k->maxv = s->maxv;
+				}
+				free(s->expr);
+			} else {
+				solutions[m++] = *s;
+			}
+		}
+		nsolutions = m;
 		qsort(solutions, nsolutions, sizeof *solutions, cmp_solutions);
+	}
 	for (i = 0; i < nsolutions; i++) {
-		if (i > 0 && strcmp(solutions[i].expr,
-				    solutions[i - 1].expr) == 0)
-			continue;
 		if (shown < max_solutions)
 			printf("%s = %ld\n", solutions[i].expr, tgt);
 		shown++;

@@ -40,11 +40,12 @@ long numbers_solve_all(const long *numbers, int n, long target,
 		       long max_solutions);
 
 /*
- * Limit each search to the given CPU time in seconds (0: no limit).
+ * Limit each search to the given time in seconds (0: no limit), measured
+ * as CPU time, or as elapsed (wall-clock) time if wall is nonzero.
  * When the limit is hit, the best result found so far is reported and
  * numbers_timed_out() returns nonzero.
  */
-void numbers_set_time_limit(double seconds);
+void numbers_set_time_limit(double seconds, int wall);
 int numbers_timed_out(void);
 
 /* A seed that differs between runs, even within the same second. */
