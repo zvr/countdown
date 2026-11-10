@@ -1,0 +1,128 @@
+.\" countdown -- manual page
+.\"
+.\" Copyright (C) 2026 Alexios Zavras
+.\" SPDX-License-Identifier: GPL-3.0-or-later
+.\"
+.TH COUNTDOWN 1 "2026" "countdown 0.1" "User Commands"
+.SH NAME
+countdown \- solve Countdown numbers and letters rounds
+.SH SYNOPSIS
+.B countdown
+.RI [ options ]
+.IR number " ... " target
+.br
+.B countdown
+.RI [ options ]
+.B \-r
+.RB [ \-l
+.IR n ]
+.RB [ \-s
+.IR n ]
+.br
+.B countdown
+.RI [ options ]
+.IR letters ...
+.SH DESCRIPTION
+.B countdown
+solves the numbers and letters rounds of the TV game.
+.PP
+If all arguments are positive integers, a numbers round is solved: the
+last argument is the target, and the program finds an expression using
+addition, subtraction, multiplication and division of (some of) the other
+numbers that reaches the target, or gets as close to it as possible.
+Among equally good results, one using the fewest operations is shown;
+ties are broken by preferring fewer divisions, then smaller intermediate
+values.
+Steps that achieve nothing (multiplying or dividing by 1, subtracting a
+number from itself, or giving back an operand) are never used.
+Each number may be used at most as many times as it appears; only exact
+division is allowed, and fractions and negative numbers are not.
+.PP
+If the arguments are letters (given individually or as strings, in any
+case), a letters round is solved: the words of a dictionary file that can
+be formed from the letters, each used at most as many times as it appears,
+are listed longest first (ties alphabetically) together with their length.
+.SH OPTIONS
+.TP
+.BR \-r ", " \-\-random
+Generate a random numbers round following the TV show rules (six numbers,
+0\(en4 large ones from 25, 50, 75, 100 and the rest from 1\(en10, each at
+most twice; target between 100 and 999), print it with its seed, and
+solve it.
+.TP
+.BR \-l ", " \-\-large " \fIn\fR"
+With
+.BR \-r ,
+use exactly
+.I n
+(0\(en4) large numbers; random by default.
+.TP
+.BR \-s ", " \-\-seed " \fIn\fR"
+With
+.BR \-r ,
+use the given seed, to reproduce a previously generated puzzle.
+.TP
+.BR \-a ", " \-\-all
+List all distinct exact solutions of a numbers round, simplest first.
+Solutions differing only in the order of operands are listed once, and
+so are solutions building a number that is available unused.
+.TP
+.BR \-t ", " \-\-time " \fIsecs\fR"
+Stop a numbers search after
+.I secs
+seconds of CPU time and show the best result found so far; a warning is
+printed on standard error.
+.TP
+.BR \-w ", " \-\-wall
+Measure
+.B \-\-time
+as elapsed (wall-clock) time instead of CPU time.
+.TP
+.BR \-C ", " \-\-conundrum
+In a letters round, only list words that use all the letters.
+.TP
+.BR \-d ", " \-\-dict " \fIfile\fR"
+Word list for letters rounds, one word per line (default
+.IR words.txt ).
+Case is ignored; words containing non-letters are skipped.
+.TP
+.BR \-n ", " \-\-count " \fIn\fR"
+Maximum number of words, or solutions with
+.BR \-a ,
+to show (default 50).
+.TP
+.BR \-h ", " \-\-help
+Show a usage summary and exit.
+.TP
+.BR \-V ", " \-\-version
+Show the version and exit.
+.PP
+Options may appear anywhere on the command line, short options can be
+combined, and long options accept
+.BR \-\-name=value .
+.SH EXIT STATUS
+0 on success, 1 on invalid arguments or if the dictionary cannot be read.
+.SH EXAMPLES
+.nf
+$ countdown 3 8 7 2 50 75 812
+(50 + 8) * 7 * 2 = 812
+
+$ countdown \-r \-l 2 \-s 42
+
+$ countdown \-a \-n 5 25 50 75 100 3 6 952
+
+$ countdown \-t 2 1 2 3 4 5 6 7 8 9 10 11 12 9973
+
+$ countdown \-d /usr/share/dict/words c h a r t e s o p
+
+$ countdown \-C \-d /usr/share/dict/words nwodtnuoc
+countdown (9)
+.fi
+.SH NOTES
+Defaults (dictionary, count, time limit and size limits) can be changed
+at compile time; see
+.IR README.md .
+.SH AUTHOR
+Alexios Zavras
+.SH LICENSE
+GPL\-3.0\-or\-later
