@@ -21,7 +21,7 @@ endif()
 target_compile_definitions(countdown PRIVATE
   VERSION="${PROJECT_VERSION}")
 
-foreach(def DEFAULT_COUNT MAX_NUMBERS MAX_EXPR MAX_LETTERS TT_BITS)
+foreach(def DEFAULT_COUNT DEFAULT_TIME_LIMIT MAX_NUMBERS MAX_EXPR MAX_LETTERS TT_BITS)
   if(DEFINED ${def})
     target_compile_definitions(countdown PRIVATE ${def}=${${def}})
   endif()

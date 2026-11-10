@@ -58,7 +58,13 @@ Example usage:
 #define MAX_LETTERS 255
 #endif
 
+#ifndef DEFAULT_TIME_LIMIT
+#define DEFAULT_TIME_LIMIT 0	/* seconds; 0 means no limit */
+#endif
+
 static const char *prog = "countdown";
+static int all_solutions;
+static long max_count = DEFAULT_COUNT;
 
 static void usage(FILE *f)
 {
@@ -71,10 +77,13 @@ static void usage(FILE *f)
 		"  -r, --random       generate and solve a random numbers round\n"
 		"  -l, --large n      number of large numbers (0-4) with --random\n"
 		"  -s, --seed n       seed for --random, to reproduce a puzzle\n"
+		"  -a, --all          list all exact solutions of a numbers round\n"
+		"  -t, --time secs    time limit for solving a numbers round\n"
+		"  -C, --conundrum    only words using all the letters\n"
 		"  -d, --dict file    word list for letters rounds "
 		"(default \"%s\")\n"
-		"  -n, --count n      maximum number of words to show "
-		"(default %d)\n"
+		"  -n, --count n      maximum number of words or solutions "
+		"to show (default %d)\n"
 		"  -h, --help         show this help and exit\n"
 		"  -V, --version      show version and exit\n",
 		prog, prog, prog, DEFAULT_DICT, DEFAULT_COUNT);
@@ -108,8 +117,19 @@ static void print_numbers(const long *numbers, int n, long target)
 	char expr[MAX_EXPR];
 	long value;
 
-	numbers_solve(numbers, n, target, expr, sizeof expr, &value);
-	printf("%s = %ld\n", expr, value);
+	if (all_solutions) {
+		long found = numbers_solve_all(numbers, n, target, max_count);
+
+		if (found > max_count)
+			printf("(%ld of %ld solutions shown)\n",
+			       max_count, found);
+	} else {
+		numbers_solve(numbers, n, target, expr, sizeof expr, &value);
+		printf("%s = %ld\n", expr, value);
+	}
+	if (numbers_timed_out())
+		fprintf(stderr, "%s: time limit reached, "
+			"results may be incomplete\n", prog);
 }
 
 static int run_random(int nlarge, unsigned long long seed)
@@ -126,7 +146,7 @@ static int run_random(int nlarge, unsigned long long seed)
 }
 
 static int run_letters(int argc, char **argv, const char *dict,
-		       long max_words)
+		       int conundrum)
 {
 	char letters[MAX_LETTERS + 1];
 	size_t len = 0, k;
@@ -149,7 +169,7 @@ static int run_letters(int argc, char **argv, const char *dict,
 		}
 	}
 	letters[len] = '\0';
-	return letters_solve(prog, letters, dict, max_words);
+	return letters_solve(prog, letters, dict, max_count, conundrum);
 }
 
 static int run_numbers(int argc, char **argv)
@@ -188,6 +208,9 @@ int main(int argc, char *argv[])
 		{ "random",  no_argument,       NULL, 'r' },
 		{ "large",   required_argument, NULL, 'l' },
 		{ "seed",    required_argument, NULL, 's' },
+		{ "all",     no_argument,       NULL, 'a' },
+		{ "time",    required_argument, NULL, 't' },
+		{ "conundrum", no_argument,     NULL, 'C' },
 		{ "dict",    required_argument, NULL, 'd' },
 		{ "count",   required_argument, NULL, 'n' },
 		{ "help",    no_argument,       NULL, 'h' },
@@ -195,8 +218,8 @@ int main(int argc, char *argv[])
 		{ NULL,      0,                 NULL, 0 }
 	};
 	const char *dict = DEFAULT_DICT;
-	long max_words = DEFAULT_COUNT;
-	int random = 0, nlarge = -1;
+	double time_limit = DEFAULT_TIME_LIMIT;
+	int random = 0, nlarge = -1, conundrum = 0;
 	int have_seed = 0;
 	unsigned long long seed = 0;
 	char *end;
@@ -205,11 +228,27 @@ int main(int argc, char *argv[])
 	if (argc > 0 && argv[0] != NULL && argv[0][0] != '\0')
 		prog = argv[0];
 
-	while ((c = getopt_long(argc, argv, "rl:s:d:n:hV",
+	while ((c = getopt_long(argc, argv, "rl:s:at:Cd:n:hV",
 				longopts, NULL)) != -1) {
 		switch (c) {
 		case 'r':
 			random = 1;
+			break;
+		case 'a':
+			all_solutions = 1;
+			break;
+		case 'C':
+			conundrum = 1;
+			break;
+		case 't':
+			errno = 0;
+			time_limit = strtod(optarg, &end);
+			if (errno != 0 || end == optarg || *end != '\0' ||
+			    !(time_limit > 0)) {
+				fprintf(stderr, "%s: --time requires a "
+					"positive number of seconds\n", prog);
+				return EXIT_FAILURE;
+			}
 			break;
 		case 's':
 			errno = 0;
@@ -235,7 +274,7 @@ int main(int argc, char *argv[])
 			dict = optarg;
 			break;
 		case 'n':
-			if (!parse_number(optarg, &max_words)) {
+			if (!parse_number(optarg, &max_count)) {
 				fprintf(stderr, "%s: --count requires a "
 					"positive number\n", prog);
 				return EXIT_FAILURE;
@@ -254,9 +293,10 @@ int main(int argc, char *argv[])
 	}
 	argc -= optind;
 	argv += optind;
+	numbers_set_time_limit(time_limit);
 
 	if (random) {
-		if (argc > 0) {
+		if (argc > 0 || conundrum) {
 			usage(stderr);
 			return EXIT_FAILURE;
 		}
@@ -268,7 +308,18 @@ int main(int argc, char *argv[])
 			"valid with -r/--random\n", prog);
 		return EXIT_FAILURE;
 	}
-	if (argc > 0 && is_word_arg(argv[0]))
-		return run_letters(argc, argv, dict, max_words);
+	if (argc > 0 && is_word_arg(argv[0])) {
+		if (all_solutions) {
+			fprintf(stderr, "%s: -a/--all is only valid for "
+				"numbers rounds\n", prog);
+			return EXIT_FAILURE;
+		}
+		return run_letters(argc, argv, dict, conundrum);
+	}
+	if (conundrum) {
+		fprintf(stderr, "%s: -C/--conundrum is only valid for "
+			"letters rounds\n", prog);
+		return EXIT_FAILURE;
+	}
 	return run_numbers(argc, argv);
 }

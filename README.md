@@ -43,7 +43,8 @@ Defaults can be changed at compile time:
 | Macro           | Default       | Meaning                                   |
 |-----------------|---------------|-------------------------------------------|
 | `DEFAULT_DICT`  | `"words.txt"` | dictionary file for letters rounds        |
-| `DEFAULT_COUNT` | `50`          | maximum number of words shown             |
+| `DEFAULT_COUNT` | `50`          | maximum number of words or solutions shown |
+| `DEFAULT_TIME_LIMIT` | `0`      | numbers round time limit in seconds (0: none) |
 | `MAX_NUMBERS`   | `16`          | maximum numbers accepted in number rounds |
 | `MAX_EXPR`      | `1024`        | maximum length of a solution expression   |
 | `MAX_LETTERS`   | `255`         | maximum letters in a letters round        |
@@ -60,6 +61,20 @@ For example:
     countdown [options] number... target
     countdown [options] -r|--random [-l|--large n] [-s|--seed n]
     countdown [options] letters...
+
+Numbers round options:
+
+- `-a` / `--all`: list all distinct exact solutions, shortest first
+  (at most `-n` of them). Solutions differing only in the order of
+  operands, like `a * b * c` and `a * c * b`, are listed once.
+- `-t secs` / `--time secs`: stop searching after this much CPU time and
+  show the best result found so far (a warning is printed on stderr).
+  With a time limit, half of it is first spent on a quick depth-first
+  search, so a good result is available even for large inputs.
+
+Letters round options:
+
+- `-C` / `--conundrum`: only list words that use all the letters.
 
 Options may appear anywhere on the command line, short options can be
 combined (`-rl2`), and long options accept `--name=value`.
@@ -120,7 +135,8 @@ longest first (ties sorted alphabetically), with their length:
 - `-d file` / `--dict file`: word list, one word per line
   (default `words.txt` in the current directory); case is ignored and
   words containing non-letters are skipped.
-- `-n n` / `--count n`: maximum number of words to show (default 50).
+- `-n n` / `--count n`: maximum number of words (or, with `-a`, number
+  solutions) to show (default 50).
 
 The bundled `words.txt` is only a small sample for testing.
 For real use, point `-d` at a full word list, e.g. `/usr/share/dict/words`

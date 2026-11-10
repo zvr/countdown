@@ -57,7 +57,7 @@ static int cmp_words(const void *a, const void *b)
 }
 
 int letters_solve(const char *prog, const char *letters,
-		  const char *dict, long max_words)
+		  const char *dict, long max_words, int conundrum)
 {
 	int avail[26] = { 0 };
 	int need[26];
@@ -81,7 +81,7 @@ int letters_solve(const char *prog, const char *letters,
 	while (fgets(line, sizeof line, f) != NULL) {
 		len = strcspn(line, "\r\n");
 		line[len] = '\0';
-		if (len == 0 || len > nletters)
+		if (len == 0 || len > nletters || (conundrum && len != nletters))
 			continue;
 		memset(need, 0, sizeof need);
 		for (i = 0; i < len; i++) {
