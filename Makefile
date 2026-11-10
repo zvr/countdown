@@ -28,9 +28,7 @@ numbers.o: numbers.c numbers.h
 letters.o: letters.c letters.h
 
 check: $(PROG)
-	./$(PROG) 3 8 7 2 50 75 812
-	./$(PROG) -d words.txt -n 5 chartesop
-	./$(PROG) -r -l 2
+	sh tests/run.sh ./$(PROG) words.txt
 
 install: $(PROG)
 	mkdir -p $(DESTDIR)$(BINDIR)

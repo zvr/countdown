@@ -1,0 +1,111 @@
+# countdown -- continuous integration
+#
+# Copyright (C) 2026 Alexios Zavras
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: GCC (Linux),    os: ubuntu-latest,  cc: gcc }
+          - { name: Clang (Linux),  os: ubuntu-latest,  cc: clang }
+          - { name: Clang (macOS),  os: macos-latest,   cc: clang }
+          - { name: MSVC (Windows), os: windows-latest, cc: cl }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ilammy/msvc-dev-cmd@v1
+        if: runner.os == 'Windows'
+      - name: Configure
+        run: >
+          cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_C_COMPILER=${{ matrix.cc }}
+          -DCMAKE_COMPILE_WARNING_AS_ERROR=ON
+      - name: Build
+        run: cmake --build build
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
+
+  make:
+    name: Makefile (Linux)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: make CFLAGS='-O2 -Werror'
+      - run: make check
+      - run: make install DESTDIR=$PWD/stage PREFIX=/usr && ls -R stage
+
+  sanitizers:
+    name: Sanitizers (${{ matrix.cc }}, ${{ matrix.sanitize }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        cc: [gcc, clang]
+        sanitize: ["address,undefined"]
+        include:
+          - { cc: clang, sanitize: memory }
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure
+        run: >
+          cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug
+          -DCMAKE_C_COMPILER=${{ matrix.cc }}
+          -DSANITIZE=${{ matrix.sanitize }}
+      - run: cmake --build build
+      - run: ctest --test-dir build --output-on-failure
+
+  msvc-asan:
+    name: Sanitizers (MSVC, address)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ilammy/msvc-dev-cmd@v1
+      - run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug -DSANITIZE=address
+      - run: cmake --build build
+      - run: ctest --test-dir build --output-on-failure
+
+  valgrind:
+    name: Valgrind
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y valgrind
+      - run: make CFLAGS='-O1 -g'
+      - name: Test under valgrind
+        env:
+          RUNNER: valgrind -q --leak-check=full --errors-for-leak-kinds=definite --error-exitcode=99
+        run: sh tests/run.sh ./countdown words.txt
+
+  static-analysis:
+    name: Static analysis
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y cppcheck clang-tools
+      - name: cppcheck
+        run: >
+          cppcheck --error-exitcode=1 --enable=warning,portability,performance
+          --inline-suppr --suppress=missingIncludeSystem
+          countdown.c numbers.c letters.c
+      - name: clang static analyzer
+        run: >
+          scan-build --status-bugs
+          cc -O2 -Wall -Wextra -o countdown countdown.c numbers.c letters.c
+      - name: GCC -fanalyzer
+        run: >
+          gcc -fanalyzer -Werror -O2 -Wall -Wextra
+          -o countdown countdown.c numbers.c letters.c

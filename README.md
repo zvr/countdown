@@ -27,6 +27,8 @@ Source layout:
   which lacks `<getopt.h>`
 - `countdown.1` -- manual page (installed by `make install` and CMake;
   view with `man ./countdown.1`)
+- `tests/run.sh` -- regression tests (POSIX shell)
+- `.github/workflows/ci.yml` -- continuous integration
 
 With make (GCC or Clang):
 
@@ -60,6 +62,25 @@ For example:
 
     make CFLAGS='-O2 -DDEFAULT_DICT=\"/usr/share/dict/words\" -DDEFAULT_COUNT=20'
     cmake -B build -DDEFAULT_DICT=/usr/share/dict/words -DDEFAULT_COUNT=20
+
+### Testing
+
+`make check`, or `ctest --test-dir build` after a CMake build, runs the
+regression tests in `tests/run.sh` (a POSIX `sh` is needed; on Windows the
+one from Git for Windows is found automatically). They can also be run
+directly, optionally under a checking tool:
+
+    sh tests/run.sh ./countdown words.txt
+    RUNNER='valgrind -q --error-exitcode=99' sh tests/run.sh ./countdown words.txt
+
+To build with sanitizers, pass e.g. `-DSANITIZE=address,undefined`
+(GCC/Clang) or `-DSANITIZE=address` (MSVC) to CMake.
+
+On every push and pull request, GitHub Actions builds and tests with GCC
+and Clang on Linux, Clang on macOS and MSVC on Windows (warnings are
+errors), with the Makefile, and under AddressSanitizer,
+UndefinedBehaviorSanitizer, MemorySanitizer and Valgrind; it also runs
+cppcheck, the Clang static analyzer and GCC's `-fanalyzer`.
 
 ## Usage
 

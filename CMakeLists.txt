@@ -12,6 +12,7 @@ project(countdown VERSION 0.1 LANGUAGES C)
 add_executable(countdown countdown.c numbers.c letters.c)
 
 if(MSVC)
+  string(REGEX REPLACE "/W[0-4]" "" CMAKE_C_FLAGS "${CMAKE_C_FLAGS}")
   target_sources(countdown PRIVATE compat/getopt.c)
   target_compile_options(countdown PRIVATE /W4)
 else()
@@ -33,3 +34,24 @@ endif()
 include(GNUInstallDirs)
 install(TARGETS countdown RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 install(FILES countdown.1 DESTINATION ${CMAKE_INSTALL_MANDIR}/man1)
+
+# e.g. -DSANITIZE=address,undefined (GCC/Clang) or -DSANITIZE=address (MSVC)
+set(SANITIZE "" CACHE STRING "sanitizers to build with")
+if(SANITIZE)
+  if(MSVC)
+    target_compile_options(countdown PRIVATE /fsanitize=${SANITIZE} /Zi)
+  else()
+    target_compile_options(countdown PRIVATE -fsanitize=${SANITIZE}
+      -fno-omit-frame-pointer -fno-sanitize-recover=all -g)
+    target_link_options(countdown PRIVATE -fsanitize=${SANITIZE})
+  endif()
+endif()
+
+enable_testing()
+find_program(SH_PROGRAM NAMES sh bash
+  HINTS "$ENV{ProgramFiles}/Git/bin" "$ENV{ProgramFiles}/Git/usr/bin")
+if(SH_PROGRAM)
+  add_test(NAME regression
+    COMMAND ${SH_PROGRAM} ${CMAKE_CURRENT_SOURCE_DIR}/tests/run.sh
+            $<TARGET_FILE:countdown> ${CMAKE_CURRENT_SOURCE_DIR}/words.txt)
+endif()
