@@ -55,6 +55,7 @@ Defaults can be changed at compile time:
 | `MAX_NUMBERS`   | `16`          | maximum numbers accepted in number rounds |
 | `MAX_EXPR`      | `1024`        | maximum length of a solution expression   |
 | `MAX_LETTERS`   | `255`         | maximum letters in a letters round        |
+| `INDEX_SUFFIX`  | `".idx"`      | appended to the word list name for its index |
 | `TT_BITS`       | `18`          | log2 of the solver's state cache entries  |
 | `VERSION`       | `"0.1"`       | version reported by `--version`           |
 
@@ -166,6 +167,20 @@ longest first (ties sorted alphabetically), with their length:
   words containing non-letters are skipped.
 - `-n n` / `--count n`: maximum number of words (or, with `-a`, number
   solutions) to show (default 50).
+- `-I` / `--index`: build an index of the word list (named like it, with
+  `.idx` appended) and exit:
+
+      $ countdown -I -d /usr/share/dict/words
+      104334 words indexed into '/usr/share/dict/words.idx'
+
+  Later letters rounds use the index automatically if it is present and
+  up to date: it records the word list's size and modification time, and
+  is ignored (with a warning) if the word list has changed since.
+  The index holds the valid words, lowercased and without duplicates,
+  sorted by length and then by anagram key (the letters in alphabetical
+  order). Words longer than the letters given are therefore never read,
+  a conundrum only reads the words of its length up to its own key, and
+  each group of anagrams is checked against the letters only once.
 
 The bundled `words.txt` is only a small sample for testing.
 For real use, point `-d` at a full word list, e.g. `/usr/share/dict/words`

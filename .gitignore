@@ -51,3 +51,6 @@
 /countdown
 build/
 out/
+
+# Word list indexes (countdown --index)
+*.idx

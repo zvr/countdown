@@ -107,5 +107,18 @@ expect_status "conundrum with numbers" 1 -C 1 2 3
 expect_status "bad time" 1 -t 0 1 2 3
 expect_status "missing dict" 1 -d does-not-exist.txt abc
 
+# letters round with an index: same results as scanning the word list
+tmp=${TMPDIR:-/tmp}/countdown-test.$$
+mkdir -p "$tmp" && cp "$dict" "$tmp/words.txt"
+expect_status "build index" 0 -I -d "$tmp/words.txt"
+expect "indexed letters" "chapters (8)
+poachers (8)" -d "$tmp/words.txt" -n 2 chartesop
+expect "indexed conundrum" "chapters (8)" -d "$tmp/words.txt" -C c h a p t e r s
+expect "indexed conundrum none" "no words found" -d "$tmp/words.txt" -C abcdefghi
+expect_status "index with arguments" 1 -I -d "$tmp/words.txt" abc
+echo "garbage" > "$tmp/words.txt.idx"
+expect "invalid index ignored" "chapters (8)" -d "$tmp/words.txt" -C chapters
+rm -rf "$tmp"
+
 echo "$((count - fail)) of $count tests passed"
 [ $fail -eq 0 ]

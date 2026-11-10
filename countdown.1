@@ -86,6 +86,16 @@ Word list for letters rounds, one word per line (default
 .IR words.txt ).
 Case is ignored; words containing non-letters are skipped.
 .TP
+.BR \-I ", " \-\-index
+Build an index of the word list, named like it with
+.I .idx
+appended, and exit.
+Later letters rounds use the index if it is present; it records the
+size and modification time of the word list and is ignored, with a
+warning, if the word list has changed since.
+In the index, words are sorted by length and anagram key, so words
+longer than the letters given are never read.
+.TP
 .BR \-n ", " \-\-count " \fIn\fR"
 Maximum number of words, or solutions with
 .BR \-a ,
