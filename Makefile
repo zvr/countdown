@@ -41,4 +41,8 @@ uninstall:
 	rm -f $(DESTDIR)$(MANDIR)/$(PROG).1
 
 clean:
-	rm -f $(PROG) $(OBJS)
+	rm -f $(OBJS)
+
+clobber: clean
+	rm -f $(PROG)
+
