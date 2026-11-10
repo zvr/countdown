@@ -1,14 +1,14 @@
 # countdown -- Makefile
-#
+
 # Copyright (C) 2026 Alexios Zavras
 # SPDX-License-Identifier: GPL-3.0-or-later
-#
-# Defaults can be overridden, e.g.:
-#   make CFLAGS='-O2 -DDEFAULT_DICT=\"/usr/share/dict/words\"'
+
+DEFS	= -DDEFAULT_DICT=\"/usr/share/dict/words\" -DDEFAULT_COUNT=15
 
 CC      ?= cc
 CFLAGS  ?= -O2
 CFLAGS  += -Wall -Wextra
+CFLAGS  += $(DEFS)
 PREFIX  ?= /usr/local
 BINDIR  ?= $(PREFIX)/bin
 MANDIR  ?= $(PREFIX)/share/man/man1

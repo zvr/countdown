@@ -1,0 +1,5 @@
+BasedOnStyle: InheritParentConfig
+TypeNames: 
+  - file_stat
+  - size_t
+  - uint64_t

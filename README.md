@@ -57,7 +57,7 @@ Defaults can be changed at compile time:
 | `MAX_LETTERS`   | `255`         | maximum letters in a letters round        |
 | `INDEX_SUFFIX`  | `".idx"`      | appended to the word list name for its index |
 | `TT_BITS`       | `18`          | log2 of the solver's state cache entries  |
-| `VERSION`       | `"0.1"`       | version reported by `--version`           |
+| `VERSION`       | `"0.0"`       | version reported by `--version`           |
 
 For example:
 
